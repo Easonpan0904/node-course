@@ -4,7 +4,7 @@ let dt = new Date();
 
 console.log(`起床了 at ${dt.toISOString()}`);
 
-let doWork = function (job, timer, cb) {
+const doWork = (job, timer, cb) => {
   setTimeout(() => {
     let dt = new Date();
 
