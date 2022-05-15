@@ -11,10 +11,10 @@ const fs = require('fs');
 //   }
 // });
 
-// fs.readFile('test1111.txt', 'utf-8', (err, data) => {
-// error
-fs.readFile('test.txt', 'utf-8', (err, data) => {
-  let fsPromise = new Promise((resolve, reject) => {
+let fsPromise = new Promise((resolve, reject) => {
+  // fs.readFile('test1111.txt', 'utf-8', (err, data) => {
+  // error
+  fs.readFile('test.txt', 'utf-8', (err, data) => {
     //success
     if (err) {
       reject(err);
@@ -22,11 +22,12 @@ fs.readFile('test.txt', 'utf-8', (err, data) => {
       resolve(data);
     }
   });
-  fsPromise
-    .then((res) => {
-      console.log(res);
-    })
-    .catch((err) => {
-      console.log(err);
-    });
 });
+
+fsPromise
+  .then((res) => {
+    console.log(res);
+  })
+  .catch((err) => {
+    console.log(err);
+  });
