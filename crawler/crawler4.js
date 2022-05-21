@@ -9,11 +9,11 @@ require('dotenv').config();
 const mysql = require('mysql2/promise');
 (async () => {
   const connection = await mysql.createConnection({
-    host: 'localhost',
-    port: 3306,
-    user: 'admin',
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
     password: process.env.DB_PWD,
-    database: 'eason_test_db',
+    database: process.env.DB_NAME,
   });
   let [data, fields] = await connection.execute('SELECT * FROM stocks');
   console.log(data);
