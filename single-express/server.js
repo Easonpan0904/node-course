@@ -4,28 +4,14 @@
 const express = require('express');
 const path = require('path');
 const app = express();
-const mysql = require('mysql2');
 require('dotenv').config();
 
 // 使用第三方套件 cors
 const cors = require('cors');
 app.use(cors());
 
-// 這裡跟爬蟲不同，不會只建立一個連線
-// 但是，也不會幫每個 request 都分別建立連線
-// ---->  connection pool
-
-let pool = mysql
-  .createPool({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    user: process.env.DB_USER,
-    password: process.env.DB_PWD,
-    database: process.env.DB_NAME,
-    connectionLimit: 10,
-    dateStrings: true,
-  })
-  .promise();
+// 重構 mysql 連線
+const pool = require('./utils/db');
 
 // express 是一個 middleware (中間件)組成的事件
 // client -- server
@@ -46,13 +32,18 @@ let pool = mysql
 // 1. next: 往下一個中間件去
 // 2. response: 結束這次的旅程 (req-res cycle)
 
+// express.urlencoded 要讓 express 認得 body 裡面的資料
+app.use(express.urlencoded({ extended: true }));
+// 要讓 express 認得 json 檔
+app.use(express.json());
+
 // 處理靜態資料
 // 靜態資料 : html, css, javascript, 圖片, 影片
 // express 少數內建的中間件 static
-// 方法 1
+// 方法 1: 不指定網址
 app.use(express.static(path.join(__dirname, 'assets')));
 
-// 方法2
+// 方法2: 指定網址
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // 一般中間件
@@ -72,75 +63,6 @@ app.get('/about', (req, res, next) => {
   res.send('About me');
 });
 
-// REST API
-// 取得 stocks 的列表
-
-app.get('/stocks', async (req, res, next) => {
-  let [data, fields] = await pool.execute('SELECT * FROM stocks');
-  res.json(data);
-});
-
-// 取得某個股票 id 的資料
-app.get('/stocks/:stockId', async (req, res, next) => {
-  // 取得網址上的參數 req.params
-  // req.params.stockId
-
-  // 直接使用SQL的語法會造成 SQL injection 的問題
-  // let [data, fields] = await pool.execute(`SELECT * FROM stocks WHERE id = ${req.params.stockId}`);
-
-  // mysql2 套件利用 prepared statement 就能避免掉 sql injection
-  // let [data, fields] = await pool.execute(`SELECT * FROM stock_prices WHERE stock_id = ?`, [req.params.stockId]);
-
-  // 空資料(查不到資料)有兩種處理方式：
-  // 1. status:200 response: []
-  // 2. status:404 response: not found.
-
-  // RESTful API 把過濾參數放在 query params
-  // /stocks/:stockId?page=1
-  // 取得目前在第幾頁, 利用 || 的特性來做預設值
-  // 如果 page 沒有值會直接取用預設值 1
-  let page = req.query.page || 1;
-  // console.log('page:', page);
-
-  // 取得目前的總筆數
-  let [allResults, fields] = await pool.execute(`SELECT * FROM stock_prices WHERE stock_id = ?`, [req.params.stockId]);
-  const total = allResults.length;
-  // console.log('total', total);
-
-  // 取得總共有幾頁
-  const perPage = 5;
-  const lastPage = Math.ceil(total / perPage);
-  // console.log('lastPage', lastPage);
-
-  // 計算 offset 是多少
-  let offset = (page - 1) * perPage;
-  // console.log('offset', offset);
-
-  // 取得這一頁的資料
-  let [pageResult, pageFields] = await pool.execute(`SELECT * FROM stock_prices WHERE stock_id = ? ORDER BY date DESC LIMIT ? OFFSET ?`, [req.params.stockId, perPage, offset]);
-
-  // test case
-  // 正面: 沒有page, page=1, page=2, page = 12
-  // 負面: page=-1, page=13, page=空白
-
-  // TODO: 回覆給前端
-
-  if (pageResult.length === 0) {
-    res.status(404).send('not found');
-  } else {
-    res.json({
-      // 用來儲存所有跟頁碼有關的資訊
-      pagination: {
-        lastPage,
-        total,
-        page,
-      },
-      // 真正的資料
-      data: pageResult,
-    });
-  }
-});
-
 app.get('/error', (req, res, next) => {
   // 發生錯誤，你丟一個錯誤出來
   // throw new Error('測試測試');
@@ -148,6 +70,20 @@ app.get('/error', (req, res, next) => {
   next('我是正確的');
   // --> 都會跳去錯誤處理中間件
 });
+
+app.get('/ssr', (req, res, next) => {
+  // 會去 views 檔案夾裡找 index.pug
+  // 第二個參數: 資料物件，會傳到 pug 那邊去，pug 可以直接使用
+  res.render('index', {
+    stocks: ['台積電', '長榮', '聯發科'],
+  });
+});
+
+const StockRouter = require('./routers/stockRouters');
+app.use('/api/stocks', StockRouter);
+
+const AuthRouter = require('./routers/authRouter');
+app.use('/api/auth', AuthRouter);
 
 // 404
 // 這個中間件在所有路由的最後
@@ -168,3 +104,17 @@ app.use((err, req, res, next) => {
 app.listen(3001, () => {
   console.log('Server listening on 3001');
 });
+
+// nodejs
+// -- 內建 filesystem --
+// fs.readFile
+// -- 第三方套件: axios, cors, express
+// npm install axios
+// const axios = require('axios')
+// -- 自己寫模組 --
+
+// NodeJS 的模組系統 CJS (CommomJS)
+
+// IIFE => CJS => ESM
+// CJS --> NodeJS 用 --> 瀏覽器不支援
+// ESM --> 瀏覽器會支援
