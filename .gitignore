@@ -131,3 +131,7 @@ dist
 
 # vscode
 .vscode
+
+# upload folders
+
+simple-express/public/members/

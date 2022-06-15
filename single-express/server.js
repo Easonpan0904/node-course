@@ -8,10 +8,40 @@ require('dotenv').config();
 
 // 使用第三方套件 cors
 const cors = require('cors');
-app.use(cors());
+// 這樣全開，但不包含跨源讀寫 cookie
+// app.use(cors());
+// origin: *
+app.use(
+  // 如果想要跨源讀寫 cookie
+  cors({
+    // 為了讓 browser 在 CORS 的情況下，還是幫我們送 cookie
+    // 這邊需要把 credentials 設定成 true，而且 origin 不可以是 *
+    // 不然等於誰都可以跨源讀寫我們網站的 cookie
+    origin: ['http://localhost:3000'],
+    credentials: true,
+  })
+);
 
 // 重構 mysql 連線
 const pool = require('./utils/db');
+
+// 啟用session
+// session-file-store 這個是為了把 session 存到硬碟去讓你們觀察
+// 正式環境我們會存 「記憶體」 --> redis, memcached (database in memory)
+const expressSession = require('express-session');
+let FileStore = require('session-file-store')(expressSession);
+app.use(
+  expressSession({
+    store: new FileStore({
+      // 存到 simple-express 的外面
+      // 為避開 nodemon 監控檔案變動
+      path: path.join(__dirname, '..', 'sessions'),
+    }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+  })
+);
 
 // express 是一個 middleware (中間件)組成的事件
 // client -- server
@@ -43,8 +73,8 @@ app.use(express.json());
 // 方法 1: 不指定網址
 app.use(express.static(path.join(__dirname, 'assets')));
 
-// 方法2: 指定網址
-app.use('/static', express.static(path.join(__dirname, 'public')));
+// 方法2: 指定網址 public
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // 一般中間件
 // app.use((request, response, next) => {
@@ -84,6 +114,9 @@ app.use('/api/stocks', StockRouter);
 
 const AuthRouter = require('./routers/authRouter');
 app.use('/api/auth', AuthRouter);
+
+const MemberRouter = require('./routers/memberRouter');
+app.use('/api/member', MemberRouter);
 
 // 404
 // 這個中間件在所有路由的最後

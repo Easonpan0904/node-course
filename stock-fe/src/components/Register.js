@@ -16,13 +16,30 @@ const Register = () => {
     setUserData({...userData, [e.target.name]: e.target.value})
   }
 
+  const handlePhoto = (e) => {
+    setUserData({...userData, [e.target.name]: e.target.files[0]})
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      let response = await axios.post(`${API_URL}/auth/register`, userData )
+      // 方法1: 沒有圖片的表單上傳
+      // let response = await axios.post(`${API_URL}/auth/register`, userData )
 
-      console.log(response.data);
+      // console.log(response.data);
+
+      // 方法2: 如果表單有圖片, 會用 Formdata 的方式來上傳
+      let formData = new FormData();
+      formData.append('email', userData.email)
+      formData.append('name', userData.name)
+      formData.append('password', userData.password)
+      formData.append('confirmPassword', userData.confirmPassword)
+      formData.append('photo', userData.photo)
+
+      let response = await axios.post(`${API_URL}/auth/register`, formData)
       
+      console.log(response.data);
+
     } catch (error) {
       console.error(error);
     }
@@ -65,7 +82,7 @@ const Register = () => {
         <label htmlFor="photo" className="flex mb-2 w-32">
           圖片
         </label>
-        <input className="w-full border-2 border-purple-200 rounded-md h-10 focus:outline-none focus:border-purple-400 px-2" type="file" id="photo" name="photo" value={userData.photo} onChange={handleChange}/>
+        <input className="w-full border-2 border-purple-200 rounded-md h-10 focus:outline-none focus:border-purple-400 px-2" type="file" id="photo" name="photo" onChange={handlePhoto}/>
       </div>
       <button className="text-xl bg-indigo-300 px-4 py-2.5 rounded hover:bg-indigo-400 transition duration-200 ease-in" onClick={handleSubmit}>註冊</button>
     </form>
